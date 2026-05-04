@@ -124,11 +124,10 @@ start_monitor.cmd --config monitor_config.local.json
 
 ## Protocol Notes
 
-This API uses TCP, not UDP.
+This project uses TCP.
 
 - `/api/metrics` and `/api/hardware` are HTTP APIs. HTTP runs over TCP.
 - `/ws/metrics` is a WebSocket endpoint. WebSocket starts with an HTTP Upgrade and also runs over TCP.
-- This project does not use UDP broadcast.
 
 ## HTTPS / SSL Deployment Recommendation
 
