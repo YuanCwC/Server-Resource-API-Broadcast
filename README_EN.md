@@ -1,6 +1,6 @@
 ﻿# Server Resource API Broadcast
 
-A Windows-focused server resource monitoring API. It collects CPU, memory, network, GPU, disk I/O, mounted drive capacity, and common Task Manager counters every 5 seconds, then exposes the data through HTTP APIs and WebSocket broadcasts for web dashboards or integrations.
+A server status monitoring API specifically for Windows. It collects CPU, memory, network, GPU, disk IO, all mounted disk capacities, common Task Manager metrics, etc., every 5 seconds, and broadcasts them via HTTP API and WebSocket.
 
 ## Quick Start Scripts
 
