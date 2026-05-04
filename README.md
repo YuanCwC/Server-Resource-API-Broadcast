@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 简体中文
 
-一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数，并通过 HTTP API 与 WebSocket 广播出去，方便后续嵌入网页显示。
+一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数等，并通过 HTTP API 与 WebSocket 广播出去。
 
 ## 一键脚本
 
@@ -126,11 +126,10 @@ start_monitor.cmd --config monitor_config.local.json
 
 ## 协议说明
 
-这个 API 使用的是 TCP，不是 UDP。
+这个API广播工具使用的是 TCP协议。
 
 - `/api/metrics` 和 `/api/hardware` 是 HTTP API，HTTP 基于 TCP。
 - `/ws/metrics` 是 WebSocket，WebSocket 也是先通过 HTTP Upgrade 建立连接，底层仍然是 TCP。
-- 当前程序没有使用 UDP 广播。
 
 ## HTTPS / SSL 部署建议
 
