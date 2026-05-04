@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+server_monitor.log
+certs/*.pem
+certs/*.key
+certs/*.crt
+monitor_config.local.json
