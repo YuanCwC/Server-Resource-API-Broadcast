@@ -245,8 +245,9 @@ class WebSocketHub:
         self._clients: set[WebSocket] = set()
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
+    async def connect(self, websocket: WebSocket, accept: bool = True) -> None:
+        if accept:
+            await websocket.accept()
         async with self._lock:
             self._clients.add(websocket)
 
@@ -1047,12 +1048,27 @@ def build_app(settings: Settings, initial_hardware: dict[str, Any] | None = None
     @app.websocket("/ws/metrics")
     async def metrics_websocket(websocket: WebSocket, api_key: str | None = Query(default=None)) -> None:
         provided_key = websocket.headers.get(API_KEY_HEADER) or api_key
+        accepted = False
+
+        if settings.api_key and not is_authorized(settings.api_key, provided_key):
+            await websocket.accept()
+            accepted = True
+            try:
+                auth_text = await asyncio.wait_for(websocket.receive_text(), timeout=5)
+                auth_payload = json.loads(auth_text)
+                if isinstance(auth_payload, dict):
+                    provided_key = auth_payload.get("api_key") or auth_payload.get("key")
+            except (asyncio.TimeoutError, json.JSONDecodeError, WebSocketDisconnect):
+                provided_key = None
+
         if not is_authorized(settings.api_key, provided_key):
+            if not accepted:
+                await websocket.accept()
             await websocket.close(code=1008)
             logging.warning("WS /ws/metrics rejected from %s", websocket.client.host if websocket.client else "-")
             return
 
-        await hub.connect(websocket)
+        await hub.connect(websocket, accept=not accepted)
         logging.info("WS /ws/metrics connected from %s", websocket.client.host if websocket.client else "-")
         try:
             async with state.lock:
@@ -1320,6 +1336,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
