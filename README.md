@@ -126,11 +126,10 @@ start_monitor.cmd --config monitor_config.local.json
 
 ## 协议说明
 
-这个 API 使用的是 TCP，不是 UDP。
+这个API广播工具使用的是 TCP协议。
 
 - `/api/metrics` 和 `/api/hardware` 是 HTTP API，HTTP 基于 TCP。
 - `/ws/metrics` 是 WebSocket，WebSocket 也是先通过 HTTP Upgrade 建立连接，底层仍然是 TCP。
-- 当前程序没有使用 UDP 广播。
 
 ## HTTPS / SSL 部署建议
 
