@@ -1,4 +1,4 @@
-﻿# Windows Server Monitor API
+﻿# Server Resource API Broadcast
 
 A Windows-focused server resource monitoring API. It collects CPU, memory, network, GPU, disk I/O, mounted drive capacity, and common Task Manager counters every 5 seconds, then exposes the data through HTTP APIs and WebSocket broadcasts for web dashboards or integrations.
 
@@ -426,3 +426,4 @@ WebSocket connections, disconnections, and authentication failures are also logg
 ## GPU Notes
 
 The script prefers `nvidia-smi` for NVIDIA GPU usage, VRAM, and temperature. If no NVIDIA GPU is available, it tries to read Windows GPU Engine performance counters. Different GPUs and drivers expose different data, so non-NVIDIA GPUs may only provide usage percentage while memory and temperature may be `null`.
+

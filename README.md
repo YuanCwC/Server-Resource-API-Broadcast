@@ -1,4 +1,4 @@
-﻿# Windows Server Monitor API
+﻿# Server Resource API Broadcast
 
 一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数，并通过 HTTP API 与 WebSocket 广播出去，方便后续嵌入网页显示。
 
@@ -530,6 +530,7 @@ WebSocket 的连接、断开和鉴权失败也会记录。
 ## GPU 说明
 
 脚本会优先使用 `nvidia-smi` 获取 NVIDIA GPU 的占用、显存和温度。如果没有 NVIDIA GPU，会尝试读取 Windows 的 GPU Engine 性能计数器。不同显卡和驱动暴露的数据不完全一致，所以非 NVIDIA 显卡可能只能拿到 GPU 使用率，显存和温度可能为 `null`。
+
 
 
 
