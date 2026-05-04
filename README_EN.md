@@ -1,6 +1,6 @@
 ﻿# Server Resource API Broadcast
 
-A server status monitoring API specifically for Windows. It collects CPU, memory, network, GPU, disk IO, all mounted disk capacities, common Task Manager metrics, etc., every 5 seconds, and broadcasts them via HTTP API and WebSocket.
+A Windows-focused server resource monitoring API. It collects CPU, memory, network, GPU, disk I/O, mounted drive capacity, and common Task Manager counters every 5 seconds, then exposes the data through HTTP APIs and WebSocket broadcasts for web dashboards or integrations.
 
 ## Quick Start Scripts
 
@@ -124,10 +124,11 @@ start_monitor.cmd --config monitor_config.local.json
 
 ## Protocol Notes
 
-This project uses TCP.
+This API uses TCP, not UDP.
 
 - `/api/metrics` and `/api/hardware` are HTTP APIs. HTTP runs over TCP.
 - `/ws/metrics` is a WebSocket endpoint. WebSocket starts with an HTTP Upgrade and also runs over TCP.
+- This project does not use UDP broadcast.
 
 ## HTTPS / SSL Deployment Recommendation
 
@@ -243,19 +244,19 @@ A minimal page for checking whether WebSocket live data works.
 
 ## API Key And Frontend Safety
 
-The examples in this README do not hard-code a production API key into browser code. Browser-side HTML, JavaScript, Network panels, error screenshots, and access logs can expose URLs or source code. If you put a secret in frontend code, visitors can see it in developer tools.
+This repository does not include a complete `web` frontend directory. The following sections are embed examples only. Browser-side HTML, JavaScript, Network panels, error screenshots, and access logs can expose URLs or source code. If you put a secret in frontend code, visitors can see it in developer tools.
 
 Recommended practices:
 
 - Use the `X-API-Key` header for HTTP API requests. Avoid putting secrets in `?api_key=`.
-- Native browser WebSocket cannot set a custom `X-API-Key` header. If you need API-key-protected WebSocket access on the public internet, use your own backend proxy or same-origin reverse proxy so the key stays server-side.
-- `?api_key=` is still supported by the server for simple testing or fully controlled LAN environments. Do not use it in public web pages.
+- Native browser WebSocket cannot set a custom `X-API-Key` header. To make browser-only examples work, WebSocket can use `?api_key=`. For public production deployments, a backend proxy or same-origin reverse proxy is still recommended so the key stays server-side.
+- `?api_key=` is suitable for local tests, troubleshooting, or controlled LAN environments. It can be used by public pages, but it may be exposed through browser URLs, proxy logs, or screenshots.
 - Server-side code such as PHP, Node.js, or Java can keep the API key, but do not commit source code, logs, or config files containing real keys to a public repository.
 - If you must temporarily use `?api_key=`, remember that browser history, proxy logs, server access logs, and screenshots may retain the key.
 
 ## HTML Embed Example
 
-Replace `SERVER_HOST` with your server IP or domain. This browser-only example is suitable for trusted LAN use without an API key. For public deployments with an API key, use a backend proxy or same-origin reverse proxy instead of putting secrets in frontend code.
+Replace `SERVER_HOST` with your server IP or domain. This browser-only example works directly when no API key is enabled. If an API key is enabled, fill `API_KEY` and the WebSocket will connect with `?api_key=`. For public production deployments, a backend proxy or same-origin reverse proxy is still recommended.
 
 ```html
 <!doctype html>
@@ -283,7 +284,9 @@ Replace `SERVER_HOST` with your server IP or domain. This browser-only example i
 
   <script>
     const SERVER_HOST = "127.0.0.1:8765";
-    const ws = new WebSocket(`ws://${SERVER_HOST}/ws/metrics`);
+    const API_KEY = ""; // Fill this only for trusted/local pages.
+    const query = API_KEY ? `?api_key=${encodeURIComponent(API_KEY)}` : "";
+    const ws = new WebSocket(`ws://${SERVER_HOST}/ws/metrics${query}`);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -301,7 +304,7 @@ Replace `SERVER_HOST` with your server IP or domain. This browser-only example i
 
 ## JavaScript Request Example
 
-Suitable for existing frontend projects. HTTP requests can use the `X-API-Key` header. Native browser WebSocket cannot set custom request headers, so do not put production API keys in frontend URLs. Use a backend proxy or same-origin reverse proxy when WebSocket authentication is needed.
+Suitable for existing frontend projects. HTTP requests can use the `X-API-Key` header. Native browser WebSocket cannot set custom request headers, so when an API key is enabled and no backend proxy is used, WebSocket needs `?api_key=`.
 
 ```js
 const apiBase = "http://127.0.0.1:8765";
@@ -333,7 +336,8 @@ async function fetchMetrics() {
 
 function subscribeMetrics(onMetrics) {
   const wsBase = apiBase.replace(/^http/, "ws");
-  const ws = new WebSocket(`${wsBase}/ws/metrics`);
+  const query = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+  const ws = new WebSocket(`${wsBase}/ws/metrics${query}`);
 
   ws.onmessage = (event) => onMetrics(JSON.parse(event.data));
   ws.onerror = () => console.error("Monitor WebSocket error");
@@ -358,7 +362,7 @@ subscribeMetrics((data) => {
 });
 ```
 
-`?api_key=` is still supported by the server, mainly for simple tests or fully controlled LAN environments. Do not expose real API keys in public pages, browser URLs, screenshots, logs, or third-party proxies.
+`?api_key=` can be used for browser WebSocket authentication, especially for browser-only pages without a backend proxy. Do not expose real API keys in public repositories, screenshots, logs, or third-party proxies.
 
 ## PHP Request Example
 
@@ -425,6 +429,7 @@ WebSocket connections, disconnections, and authentication failures are also logg
 ## GPU Notes
 
 The script prefers `nvidia-smi` for NVIDIA GPU usage, VRAM, and temperature. If no NVIDIA GPU is available, it tries to read Windows GPU Engine performance counters. Different GPUs and drivers expose different data, so non-NVIDIA GPUs may only provide usage percentage while memory and temperature may be `null`.
+
 
 
 

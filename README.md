@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 简体中文
 
-一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数等，并通过 HTTP API 与 WebSocket 广播出去。
+一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数，并通过 HTTP API 与 WebSocket 广播出去，方便后续嵌入网页显示。
 
 ## 一键脚本
 
@@ -126,10 +126,11 @@ start_monitor.cmd --config monitor_config.local.json
 
 ## 协议说明
 
-这个API广播工具使用的是 TCP协议。
+这个 API 使用的是 TCP，不是 UDP。
 
 - `/api/metrics` 和 `/api/hardware` 是 HTTP API，HTTP 基于 TCP。
 - `/ws/metrics` 是 WebSocket，WebSocket 也是先通过 HTTP Upgrade 建立连接，底层仍然是 TCP。
+- 当前程序没有使用 UDP 广播。
 
 ## HTTPS / SSL 部署建议
 
@@ -245,19 +246,19 @@ GET /demo
 
 ## API Key 与前端安全
 
-README 里的网页示例不会写死生产 API Key。原因是浏览器端的 HTML、JS、Network 请求、报错截图和访问日志都可能暴露 URL 或源码；如果把密钥写进前端代码，别人打开开发者工具就能看到。
+本仓库不内置完整 `web` 前端目录，下面只提供 HTML / JavaScript 嵌入示例。浏览器端的 HTML、JS、Network 请求、报错截图和访问日志都可能暴露 URL 或源码；如果把密钥写进前端代码，别人打开开发者工具就能看到。
 
 推荐做法：
 
 - HTTP API 请求使用 `X-API-Key` 请求头，不推荐把密钥放进 `?api_key=`。
-- 浏览器原生 WebSocket 不能自定义 `X-API-Key` 请求头，所以公网启用密钥时，推荐使用自己的后端代理或同源反代，让密钥只保存在服务端。
-- `?api_key=` 仍然被服务端兼容，适合本机测试、临时排查或完全受控的内网，不建议用于公网网页。
+- 浏览器原生 WebSocket 不能自定义 `X-API-Key` 请求头。为了让纯前端示例能直接连上，WebSocket 可使用 `?api_key=`；公网生产环境仍推荐使用自己的后端代理或同源反代，让密钥只保存在服务端。
+- `?api_key=` 适合本机测试、临时排查或完全受控的内网。公网网页可以用，但要知道它会暴露在浏览器地址、代理日志或截图中。
 - PHP、Node、Java 等服务端代码可以保存 API Key，但不要把包含真实密钥的源码、日志或配置文件提交到公开仓库。
 - 如果必须临时用 `?api_key=`，要注意浏览器历史、代理日志、服务器访问日志和截图都可能留下密钥。
 
 ## HTML 嵌入示例
 
-把 `SERVER_HOST` 换成服务器 IP 或域名。这个纯浏览器示例适合未启用 API Key 的内网/受信环境；公网启用 API Key 时，请使用后端代理或同源反代，不要把密钥写进前端。
+把 `SERVER_HOST` 换成服务器 IP 或域名。这个纯浏览器示例可以在未启用 API Key 时直接使用；如果启用了 API Key，填写 `API_KEY` 后 WebSocket 会通过 `?api_key=` 连接。公网生产环境更推荐后端代理或同源反代。
 
 ```html
 <!doctype html>
@@ -304,7 +305,9 @@ README 里的网页示例不会写死生产 API Key。原因是浏览器端的 H
 
   <script>
     const SERVER_HOST = "127.0.0.1:8765";
-    const ws = new WebSocket(`ws://${SERVER_HOST}/ws/metrics`);
+    const API_KEY = ""; // 启用密钥时填写；公开网页不建议写真实密钥
+    const query = API_KEY ? `?api_key=${encodeURIComponent(API_KEY)}` : "";
+    const ws = new WebSocket(`ws://${SERVER_HOST}/ws/metrics${query}`);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -351,7 +354,7 @@ README 里的网页示例不会写死生产 API Key。原因是浏览器端的 H
 
 ## JavaScript 请求示例
 
-适合在已有前端项目里用。HTTP 请求可以用 `X-API-Key` 请求头；浏览器原生 WebSocket 不能设置自定义请求头，所以启用 API Key 时不要把密钥写进前端 URL，建议通过自己的后端代理或同源反代连接 WebSocket。
+适合在已有前端项目里用。HTTP 请求可以用 `X-API-Key` 请求头；浏览器原生 WebSocket 不能设置自定义请求头，所以启用 API Key 且不使用后端代理时，WebSocket 需要使用 `?api_key=`。
 
 ```js
 const apiBase = "http://127.0.0.1:8765";
@@ -383,7 +386,8 @@ async function fetchMetrics() {
 
 function subscribeMetrics(onMetrics) {
   const wsBase = apiBase.replace(/^http/, "ws");
-  const ws = new WebSocket(`${wsBase}/ws/metrics`);
+  const query = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+  const ws = new WebSocket(`${wsBase}/ws/metrics${query}`);
 
   ws.onmessage = (event) => onMetrics(JSON.parse(event.data));
   ws.onerror = () => console.error("Monitor WebSocket error");
@@ -413,7 +417,7 @@ subscribeMetrics((data) => {
 });
 ```
 
-`?api_key=` 仍然被服务端支持，主要用于简单测试或完全受控的内网场景。不要在公网网页、浏览器地址、截图、日志或第三方代理里暴露真实 API Key。
+`?api_key=` 可用于浏览器 WebSocket 鉴权，尤其是没有后端代理的纯前端页面。注意：不要在公开仓库、截图、日志或第三方代理里暴露真实 API Key。
 
 ## PHP 请求示例
 
@@ -529,6 +533,7 @@ WebSocket 的连接、断开和鉴权失败也会记录。
 ## GPU 说明
 
 脚本会优先使用 `nvidia-smi` 获取 NVIDIA GPU 的占用、显存和温度。如果没有 NVIDIA GPU，会尝试读取 Windows 的 GPU Engine 性能计数器。不同显卡和驱动暴露的数据不完全一致，所以非 NVIDIA 显卡可能只能拿到 GPU 使用率，显存和温度可能为 `null`。
+
 
 
 
