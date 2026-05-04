@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 简体中文
 
-一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数，并通过 HTTP API 与 WebSocket 广播出去，方便后续嵌入网页显示。
+一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数等，并通过 HTTP API 与 WebSocket 广播出去。
 
 ## 一键脚本
 
