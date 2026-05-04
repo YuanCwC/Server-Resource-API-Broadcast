@@ -1,5 +1,7 @@
 ﻿# Server Resource API Broadcast
 
+[English](README_EN.md) | 简体中文
+
 一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数，并通过 HTTP API 与 WebSocket 广播出去，方便后续嵌入网页显示。
 
 ## 一键脚本
@@ -234,7 +236,7 @@ GET /demo
 ## 当前采集内容
 
 - `system`：正常运行时间、开机时间、进程数、线程数、句柄数。
-- `hardware`：CPU 名称、内存条信息、GPU 名称、磁盘设备名称。
+- `hardware`：CPU 名称、内存条信息、GPU 名称、磁盘设备名称。程序会自己检测主机内存容量、DDR 代数和频率，并在 `hardware.memory.name` / `hardware.memory.display_name` 合成整机内存显示句，例如 `32GB DDR5 4800MHz (2 x 16GB)`；每根内存条也会在 `modules[].name` / `modules[].display_name` 返回例如 `16GB DDR5 4800MHz`。
 - `cpu`：总 CPU 占用、物理核心数、逻辑核心数、当前频率、每个物理处理器包、每个逻辑处理器占用。
 - `memory`：总内存、已用内存、可用内存、空闲内存、内存占用百分比。
 - `network`：总上行/下行速度、总发送/接收流量、每个网络接口的上下行速度、IP、连接状态和网卡速率。
@@ -334,7 +336,7 @@ README 里的网页示例不会写死生产 API Key。原因是浏览器端的 H
         .map((gpu) => `${gpu.index}: ${gpu.name}`)
         .join("\n") || "N/A";
       document.getElementById("memoryHardware").textContent = data.hardware.memory.module_details_available
-        ? data.hardware.memory.modules.map((module) => `${module.index}: ${module.manufacturer ?? ""} ${module.part_number ?? ""} ${module.capacity_gb ?? "N/A"} GB`).join("\n")
+        ? data.hardware.memory.modules.map((module) => `${module.index}: ${module.display_name ?? `${module.manufacturer ?? ""} ${module.part_number ?? ""} ${module.capacity_gb ?? "N/A"} GB`}`).join("\n")
         : `Total ${data.hardware.memory.total_gb} GB\n${data.hardware.memory.message ?? ""}`;
       document.getElementById("cpuPackages").textContent = data.cpu.processors
         .map((cpu) => `${cpu.device_id}: ${cpu.name}, load ${cpu.load_percent ?? "N/A"}%`)
@@ -493,9 +495,7 @@ $data = json_decode($body, true);
     <ul>
       <?php foreach ($data['hardware']['memory']['modules'] as $module): ?>
         <li>
-          <?= htmlspecialchars($module['manufacturer'] ?? '') ?>
-          <?= htmlspecialchars($module['part_number'] ?? '') ?>
-          <?= htmlspecialchars($module['capacity_gb'] ?? 'N/A') ?> GB
+          <?= htmlspecialchars($module['display_name'] ?? (($module['manufacturer'] ?? '') . ' ' . ($module['part_number'] ?? '') . ' ' . ($module['capacity_gb'] ?? 'N/A') . ' GB')) ?>
         </li>
       <?php endforeach; ?>
     </ul>
@@ -530,6 +530,11 @@ WebSocket 的连接、断开和鉴权失败也会记录。
 ## GPU 说明
 
 脚本会优先使用 `nvidia-smi` 获取 NVIDIA GPU 的占用、显存和温度。如果没有 NVIDIA GPU，会尝试读取 Windows 的 GPU Engine 性能计数器。不同显卡和驱动暴露的数据不完全一致，所以非 NVIDIA 显卡可能只能拿到 GPU 使用率，显存和温度可能为 `null`。
+
+
+
+
+
 
 
 

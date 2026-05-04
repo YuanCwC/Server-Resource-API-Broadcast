@@ -386,6 +386,105 @@ def read_windows_processors() -> list[dict[str, Any]]:
     return processors
 
 
+def parse_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def memory_type_name(value: Any) -> str | None:
+    type_code = parse_optional_int(value)
+    names = {
+        20: "DDR",
+        21: "DDR2",
+        22: "DDR2 FB-DIMM",
+        24: "DDR3",
+        26: "DDR4",
+        27: "LPDDR",
+        28: "LPDDR2",
+        29: "LPDDR3",
+        30: "LPDDR4",
+        34: "DDR5",
+        35: "LPDDR5",
+    }
+    return names.get(type_code)
+
+
+def format_capacity_label(capacity_gb: float | None) -> str | None:
+    if capacity_gb is None:
+        return None
+    if float(capacity_gb).is_integer():
+        return f"{int(capacity_gb)}GB"
+    return f"{capacity_gb:g}GB"
+
+
+def build_memory_display_name(capacity_gb: float | None, memory_type: str | None, speed_mhz: Any, fallback: str | None = None) -> str | None:
+    parts: list[str] = []
+    capacity_label = format_capacity_label(capacity_gb)
+    speed = parse_optional_int(speed_mhz)
+    if capacity_label:
+        parts.append(capacity_label)
+    if memory_type:
+        parts.append(memory_type)
+    if speed:
+        parts.append(f"{speed}MHz")
+    if parts:
+        return " ".join(parts)
+    return fallback
+
+
+def group_memory_capacity_labels(modules: list[dict[str, Any]]) -> str | None:
+    groups: dict[str, int] = {}
+    for module in modules:
+        label = format_capacity_label(module.get("capacity_gb"))
+        if not label:
+            continue
+        groups[label] = groups.get(label, 0) + 1
+    if not groups:
+        return None
+    return " + ".join(f"{count} x {label}" for label, count in groups.items())
+
+
+def build_memory_summary(modules: list[dict[str, Any]], fallback_total_gb: float | None) -> str | None:
+    detected_total = sum(float(module.get("capacity_gb") or 0) for module in modules)
+    total_label = format_capacity_label(detected_total if detected_total > 0 else fallback_total_gb)
+    memory_types = {module.get("memory_type") for module in modules if module.get("memory_type")}
+    speeds = {
+        parse_optional_int(module.get("configured_clock_mhz") or module.get("speed_mhz"))
+        for module in modules
+        if parse_optional_int(module.get("configured_clock_mhz") or module.get("speed_mhz"))
+    }
+    capacity_group = group_memory_capacity_labels(modules)
+
+    if total_label and len(memory_types) == 1 and len(speeds) == 1:
+        summary = f"{total_label} {next(iter(memory_types))} {next(iter(speeds))}MHz"
+        if capacity_group:
+            summary += f" ({capacity_group})"
+        return summary
+
+    if total_label and len(memory_types) == 1:
+        summary = f"{total_label} {next(iter(memory_types))}"
+        if capacity_group:
+            summary += f" ({capacity_group})"
+        return summary
+
+    if total_label and len(speeds) == 1:
+        summary = f"{total_label} {next(iter(speeds))}MHz"
+        if capacity_group:
+            summary += f" ({capacity_group})"
+        return summary
+
+    module_names = [module.get("display_name") for module in modules if module.get("display_name")]
+    if total_label and module_names:
+        return f"{total_label} memory ({' + '.join(module_names)})"
+    if total_label:
+        return total_label
+    return None
+
+
 def read_registry_cpu_processors() -> list[dict[str, Any]]:
     try:
         winreg = __import__("winreg")
@@ -449,7 +548,7 @@ def read_registry_cpu_processors() -> list[dict[str, Any]]:
 def read_memory_modules() -> dict[str, Any]:
     data = run_powershell_json(
         "Get-CimInstance Win32_PhysicalMemory | "
-        "Select-Object BankLabel,DeviceLocator,Manufacturer,PartNumber,SerialNumber,Capacity,Speed,ConfiguredClockSpeed | "
+        "Select-Object BankLabel,DeviceLocator,Manufacturer,PartNumber,SerialNumber,Capacity,Speed,ConfiguredClockSpeed,MemoryType,SMBIOSMemoryType | "
         "ConvertTo-Json -Compress"
     )
     memory = psutil.virtual_memory()
@@ -469,20 +568,41 @@ def read_memory_modules() -> dict[str, Any]:
     modules: list[dict[str, Any]] = []
     for index, module in enumerate(data):
         capacity = module.get("Capacity")
+        capacity_gb = bytes_to_gb(capacity) if capacity is not None else None
+        configured_clock_mhz = module.get("ConfiguredClockSpeed")
+        speed_mhz = module.get("Speed")
+        smbios_memory_type = parse_optional_int(module.get("SMBIOSMemoryType"))
+        memory_type = memory_type_name(smbios_memory_type) or memory_type_name(module.get("MemoryType"))
+        part_number = clean_windows_device_name(module.get("PartNumber"))
+        display_name = build_memory_display_name(
+            capacity_gb,
+            memory_type,
+            configured_clock_mhz or speed_mhz,
+            part_number,
+        )
         modules.append(
             {
                 "index": index,
+                "name": display_name,
+                "display_name": display_name,
                 "bank_label": module.get("BankLabel"),
                 "device_locator": module.get("DeviceLocator"),
                 "manufacturer": clean_windows_device_name(module.get("Manufacturer")),
-                "part_number": clean_windows_device_name(module.get("PartNumber")),
+                "part_number": part_number,
                 "serial_number": clean_windows_device_name(module.get("SerialNumber")),
-                "capacity_gb": bytes_to_gb(capacity) if capacity is not None else None,
-                "speed_mhz": module.get("Speed"),
-                "configured_clock_mhz": module.get("ConfiguredClockSpeed"),
+                "capacity_gb": capacity_gb,
+                "memory_type": memory_type,
+                "memory_type_code": parse_optional_int(module.get("MemoryType")),
+                "smbios_memory_type": smbios_memory_type,
+                "speed_mhz": speed_mhz,
+                "configured_clock_mhz": configured_clock_mhz,
             }
         )
 
+    summary = build_memory_summary(modules, result.get("total_gb"))
+    result["name"] = summary
+    result["display_name"] = summary
+    result["summary"] = summary
     result["modules"] = modules
     result["module_details_available"] = bool(modules)
     return result
@@ -1200,6 +1320,10 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
 
 

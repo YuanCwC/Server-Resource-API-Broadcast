@@ -234,7 +234,7 @@ A minimal page for checking whether WebSocket live data works.
 ## Collected Data
 
 - `system`: uptime, boot time, process count, thread count, handle count.
-- `hardware`: CPU name, memory module information, GPU names, disk device names.
+- `hardware`: CPU name, memory module information, GPU names, disk device names. The program detects host memory capacity, DDR generation, and frequency, then builds `hardware.memory.name` / `hardware.memory.display_name` such as `32GB DDR5 4800MHz (2 x 16GB)`. Each module also includes `modules[].name` / `modules[].display_name` such as `16GB DDR5 4800MHz` when Windows exposes enough data.
 - `cpu`: total CPU usage, physical cores, logical cores, current frequency, physical processor packages, logical processor usage.
 - `memory`: total, used, available, free memory, and memory usage percentage.
 - `network`: total upload/download speed, total sent/received traffic, per-interface upload/download speed, IP addresses, connection state, and NIC speed.
@@ -426,4 +426,7 @@ WebSocket connections, disconnections, and authentication failures are also logg
 ## GPU Notes
 
 The script prefers `nvidia-smi` for NVIDIA GPU usage, VRAM, and temperature. If no NVIDIA GPU is available, it tries to read Windows GPU Engine performance counters. Different GPUs and drivers expose different data, so non-NVIDIA GPUs may only provide usage percentage while memory and temperature may be `null`.
+
+
+
 
