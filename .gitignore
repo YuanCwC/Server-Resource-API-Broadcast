@@ -1,8 +1,1 @@
-.venv/
-__pycache__/
-*.pyc
-server_monitor.log
-certs/*.pem
-certs/*.key
-certs/*.crt
-monitor_config.local.json
+Nothing should be ignored based on the provided file changes, as they only include README files and the .gitignore file itself. No build artifacts, dependencies, or temporary files are present in the changes.

@@ -1,18 +1,33 @@
-﻿# Server Resource API Broadcast
+# Server Resource API Broadcast
 
-[English](README_EN.md) | 简体中文
+[English](README_EN.md) | [Русский](README_RU.md) | [日本語](README_JA.md) | 简体中文
 
 一个专门面向 Windows 的服务器状态监控 API。它会每 5 秒采集一次 CPU、内存、网络、GPU、磁盘 IO、所有已挂载磁盘容量、任务管理器常见计数，并通过 HTTP API 与 WebSocket 广播出去，方便后续嵌入网页显示。
 
+## 项目特点
+
+- **实时监控**：每 5 秒自动采集系统资源数据
+- **多协议支持**：提供 HTTP REST API 和 WebSocket 实时广播
+- **全面监控**：涵盖 CPU、内存、网络、GPU、磁盘等所有关键指标
+- **灵活配置**：支持命令行参数、环境变量、配置文件多种配置方式
+- **安全认证**：内置 API Key 认证机制，支持 HTTPS/WSS
+- **跨域友好**：默认允许浏览器跨域访问，便于前端集成
+- **自动检测**：启动时自动检测各项硬件信息的可读性
+
 ## 一键脚本
 
-第一次使用先运行：
+第一次使用先运行环境检查脚本：
 
 ```cmd
 check_env.cmd
 ```
 
-它会检查 Python 3.10+、创建 `.venv` 虚拟环境，并安装 `requirements.txt` 里的依赖。如果没有 Python，会尝试通过 `winget` 安装 Python 3.12；如果电脑没有 `winget`，需要手动安装 Python。
+该脚本会：
+1. 检查是否安装 Python 3.10+
+2. 创建 `.venv` 虚拟环境
+3. 安装 `requirements.txt` 中的依赖包
+4. 如果没有 Python，会尝试通过 `winget` 安装 Python 3.12
+5. 如果电脑没有 `winget`，需要手动安装 Python
 
 启动服务：
 
@@ -20,13 +35,15 @@ check_env.cmd
 start_monitor.cmd
 ```
 
-程序会直接启动并显示启动自检结果。能读取的项目会显示绿色 `[True]`，不能读取的项目会显示红色 `[False]` 并给出原因，例如：
+程序会直接启动并显示启动自检结果。能读取的项目会显示绿色 `[True]`，不能读取的项目会显示红色 `[False]` 并给出原因：
 
 ```text
 CPU[True] total=8.2%, logical=12
 Memory[True] total=15.16GB, available=5.34GB
 MemoryModules[False] Physical memory module details are unavailable. Windows denied CIM/WMI access or no module data was returned.
 ```
+
+### 命令行参数
 
 也可以在启动命令里直接传密钥：
 
@@ -46,7 +63,15 @@ start_monitor.cmd --port 8765 --interval 5 --api-key "你的密钥"
 start_monitor.cmd --ssl-certfile certs\fullchain.pem --ssl-keyfile certs\privkey.pem --api-key "你的密钥"
 ```
 
-也可以用环境变量：
+指定配置文件：
+
+```cmd
+start_monitor.cmd --config monitor_config.local.json
+```
+
+### 环境变量
+
+也可以用环境变量配置：
 
 ```cmd
 set MONITOR_API_KEY=你的密钥
@@ -59,7 +84,7 @@ start_monitor.cmd
 
 `start_monitor.cmd` 会直接启动服务。如果发现 `.venv` 或依赖不存在，会自动先调用 `check_env.cmd`。
 
-安全提醒：不要把真实 API Key、证书私钥或已填写生产密钥的配置文件提交到公开仓库。公开示例里请保留占位符；真实部署建议使用环境变量，或使用已被 `.gitignore` 忽略的 `monitor_config.local.json`。
+**安全提醒**：不要把真实 API Key、证书私钥或已填写生产密钥的配置文件提交到公开仓库。公开示例里请保留占位符；真实部署建议使用环境变量，或使用已被 `.gitignore` 忽略的 `monitor_config.local.json`。
 
 ## 配置文件
 
@@ -95,7 +120,7 @@ start_monitor.cmd
 start_monitor.cmd
 ```
 
-配置优先级：
+### 配置优先级
 
 ```text
 命令行参数 > 环境变量 > monitor_config.json > 默认值
@@ -115,14 +140,6 @@ start_monitor.cmd
 ```cmd
 start_monitor.cmd --config monitor_config.local.json
 ```
-
-## 协议说明
-
-这个 API 使用的是 TCP，不是 UDP。
-
-- `/api/metrics` 和 `/api/hardware` 是 HTTP API，HTTP 基于 TCP。
-- `/ws/metrics` 是 WebSocket，WebSocket 也是先通过 HTTP Upgrade 建立连接，底层仍然是 TCP。
-- 当前程序没有使用 UDP 广播。
 
 ## HTTPS / SSL 部署建议
 
@@ -179,7 +196,7 @@ python .\server_monitor_api.py --ssl-certfile certs\fullchain.pem --ssl-keyfile 
 
 - `http://127.0.0.1:8765/api/metrics`
 - `http://127.0.0.1:8765/api/hardware`
-- `ws://局域网IP:8765/ws/metrics`
+- `ws://局域网 IP:8765/ws/metrics`
 - `http://127.0.0.1:8765/demo`
 - `http://127.0.0.1:8765/docs`
 
@@ -189,7 +206,7 @@ python .\server_monitor_api.py --ssl-certfile certs\fullchain.pem --ssl-keyfile 
 Invoke-RestMethod "http://127.0.0.1:8765/api/metrics" -Headers @{"X-API-Key"="你的密钥"}
 ```
 
-## 接口
+## 接口文档
 
 HTTP API 默认允许浏览器跨域 `GET/OPTIONS` 请求，并允许 `X-API-Key` 请求头，方便把数据嵌入到独立网页里。公网部署时仍建议使用 API Key、后端代理或同源反代来控制访问。
 
@@ -225,28 +242,77 @@ GET /demo
 
 这是一个极简网页，用来验证 WebSocket 实时数据是否正常。
 
+### API 文档
+
+```http
+GET /docs
+```
+
+Swagger/OpenAPI 格式的交互式 API 文档。
+
 ## 当前采集内容
 
-- `system`：正常运行时间、开机时间、进程数、线程数、句柄数。
-- `hardware`：CPU 名称、内存条信息、GPU 名称、磁盘设备名称。程序会自己检测主机内存容量、DDR 代数和频率，并在 `hardware.memory.name` / `hardware.memory.display_name` 合成整机内存显示句，例如 `32GB DDR5 4800MHz (2 x 16GB)`；每根内存条也会在 `modules[].name` / `modules[].display_name` 返回例如 `16GB DDR5 4800MHz`。
-- `cpu`：总 CPU 占用、物理核心数、逻辑核心数、当前频率、每个物理处理器包、每个逻辑处理器占用。
-- `memory`：总内存、已用内存、可用内存、空闲内存、内存占用百分比。
-- `network`：总上行/下行速度、总发送/接收流量、每个网络接口的上下行速度、IP、连接状态和网卡速率。
-- `disk.io`：所有磁盘设备的读写速度和忙碌百分比。
-- `disk.drives`：自动扫描到的所有已挂载盘符/卷容量，不再固定 C 盘和 D 盘。
-- `gpu`：多张 NVIDIA GPU 会全部列出；没有 NVIDIA 时会尝试读取 Windows GPU 性能计数器。
+### 系统信息 (`system`)
+- 正常运行时间
+- 开机时间
+- 进程数
+- 线程数
+- 句柄数
+
+### 硬件信息 (`hardware`)
+- CPU 名称
+- 内存条信息（容量、DDR 代数、频率）
+- GPU 名称
+- 磁盘设备名称
+
+程序会自己检测主机内存容量、DDR 代数和频率，并在 `hardware.memory.name` / `hardware.memory.display_name` 合成整机内存显示句，例如 `32GB DDR5 4800MHz (2 x 16GB)`；每根内存条也会在 `modules[].name` / `modules[].display_name` 返回例如 `16GB DDR5 4800MHz`。
+
+### CPU (`cpu`)
+- 总 CPU 占用
+- 物理核心数
+- 逻辑核心数
+- 当前频率
+- 每个物理处理器包
+- 每个逻辑处理器占用
+
+### 内存 (`memory`)
+- 总内存
+- 已用内存
+- 可用内存
+- 空闲内存
+- 内存占用百分比
+
+### 网络 (`network`)
+- 总上行/下行速度
+- 总发送/接收流量
+- 每个网络接口的上下行速度
+- IP 地址
+- 连接状态
+- 网卡速率
+
+### 磁盘 IO (`disk.io`)
+- 所有磁盘设备的读写速度
+- 忙碌百分比
+
+### 磁盘卷 (`disk.drives`)
+- 自动扫描到的所有已挂载盘符/卷容量
+- 不再固定 C 盘和 D 盘
+
+### GPU (`gpu`)
+- 多张 NVIDIA GPU 会全部列出
+- 没有 NVIDIA 时会尝试读取 Windows GPU 性能计数器
 
 ## API Key 与前端安全
 
 本仓库不内置完整 `web` 前端目录，下面只提供 HTML / JavaScript 嵌入示例。浏览器端的 HTML、JS、Network 请求、报错截图和访问日志都可能暴露 URL 或源码；如果把密钥写进前端代码，别人打开开发者工具就能看到。
 
-推荐做法：
+### 推荐做法
 
-- HTTP API 请求使用 `X-API-Key` 请求头，不推荐把密钥放进 `?api_key=`。
-- 浏览器原生 WebSocket 不能自定义 `X-API-Key` 请求头。为了让纯前端示例能直接连上，WebSocket 可使用 `?api_key=`；公网生产环境仍推荐使用自己的后端代理或同源反代，让密钥只保存在服务端。
-- `?api_key=` 适合本机测试、临时排查或完全受控的内网。公网网页可以用，但要知道它会暴露在浏览器地址、代理日志或截图中。
-- PHP、Node、Java 等服务端代码可以保存 API Key，但不要把包含真实密钥的源码、日志或配置文件提交到公开仓库。
-- 如果必须临时用 `?api_key=`，要注意浏览器历史、代理日志、服务器访问日志和截图都可能留下密钥。
+1. **HTTP API 请求**：使用 `X-API-Key` 请求头，不推荐把密钥放进 `?api_key=`
+2. **WebSocket 连接**：浏览器原生 WebSocket 不能自定义 `X-API-Key` 请求头。为了让纯前端示例能直接连上，WebSocket 可使用 `?api_key=`；公网生产环境仍推荐使用自己的后端代理或同源反代，让密钥只保存在服务端
+3. **使用场景**：`?api_key=` 适合本机测试、临时排查或完全受控的内网。公网网页可以用，但要知道它会暴露在浏览器地址、代理日志或截图中
+4. **服务端代码**：PHP、Node、Java 等服务端代码可以保存 API Key，但不要把包含真实密钥的源码、日志或配置文件提交到公开仓库
+5. **风险提示**：如果必须临时用 `?api_key=`，要注意浏览器历史、代理日志、服务器访问日志和截图都可能留下密钥
 
 ## HTML 嵌入示例
 
@@ -526,16 +592,27 @@ WebSocket 的连接、断开和鉴权失败也会记录。
 
 脚本会优先使用 `nvidia-smi` 获取 NVIDIA GPU 的占用、显存和温度。如果没有 NVIDIA GPU，会尝试读取 Windows 的 GPU Engine 性能计数器。不同显卡和驱动暴露的数据不完全一致，所以非 NVIDIA 显卡可能只能拿到 GPU 使用率，显存和温度可能为 `null`。
 
+## 常见问题
 
+### 为什么内存模块信息显示不可用？
+Windows 对 CIM/WMI 的访问有限制，可能需要管理员权限或组策略调整。
 
+### 如何查看详细的错误日志？
+查看 `server_monitor.log` 文件，里面包含了所有 HTTP 请求和 WebSocket 连接的详细日志。
 
+### 可以在 Linux 上使用吗？
+当前版本仅支持 Windows，因为使用了 Windows 特定的性能计数器和 WMI 接口。
 
+### 如何修改数据采集间隔？
+通过 `--interval` 参数或 `MONITOR_INTERVAL_SECONDS` 环境变量设置，单位为秒。
 
+## 技术栈
 
+- Python 3.10+
+- aiohttp (异步 HTTP 服务器)
+- psutil (系统监控)
+- asyncio (异步编程)
 
+## 许可证
 
-
-
-
-
-
+本项目采用 MIT 许可证。
