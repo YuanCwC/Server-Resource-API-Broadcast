@@ -1,30 +1,49 @@
-﻿# Server Resource API Broadcast
+# Server Resource API Broadcast
+
+[English](README_EN.md) | [Русский](README_RU.md) | [日本語](README_JA.md) | 简体中文
 
 A Windows-focused server resource monitoring API. It collects CPU, memory, network, GPU, disk I/O, mounted drive capacity, and common Task Manager counters every 5 seconds, then exposes the data through HTTP APIs and WebSocket broadcasts for web dashboards or integrations.
 
+## Project Features
+
+- **Real-time Monitoring**: Automatically collects system resource data every 5 seconds
+- **Multi-protocol Support**: Provides HTTP REST API and WebSocket real-time broadcasting
+- **Comprehensive Monitoring**: Covers all key metrics including CPU, memory, network, GPU, and disk
+- **Flexible Configuration**: Supports command-line arguments, environment variables, and configuration files
+- **Secure Authentication**: Built-in API Key authentication mechanism with HTTPS/WSS support
+- **CORS Friendly**: Allows browser cross-origin access by default for easy frontend integration
+- **Auto Detection**: Automatically detects hardware information readability at startup
+
 ## Quick Start Scripts
 
-Run this first:
+Run the environment check script first:
 
 ```cmd
 check_env.cmd
 ```
 
-It checks for Python 3.10+, creates a `.venv` virtual environment, and installs the dependencies from `requirements.txt`. If Python is not found, it will try to install Python 3.12 through `winget`. If `winget` is unavailable, install Python manually.
+This script will:
+1. Check if Python 3.10+ is installed
+2. Create a `.venv` virtual environment
+3. Install dependencies from `requirements.txt`
+4. If Python is not found, try to install Python 3.12 via `winget`
+5. If `winget` is unavailable, install Python manually
 
-Start the API server:
+Start the service:
 
 ```cmd
 start_monitor.cmd
 ```
 
-The program starts directly and prints startup feature checks. Available features are shown in green as `[True]`; unavailable features are shown in red as `[False]` with a reason, for example:
+The program starts directly and displays startup self-check results. Available features are shown in green as `[True]`; unavailable features are shown in red as `[False]` with a reason:
 
 ```text
 CPU[True] total=8.2%, logical=12
 Memory[True] total=15.16GB, available=5.34GB
 MemoryModules[False] Physical memory module details are unavailable. Windows denied CIM/WMI access or no module data was returned.
 ```
+
+### Command-line Arguments
 
 You can also pass the API key directly:
 
@@ -44,7 +63,15 @@ Start with your own HTTPS certificate:
 start_monitor.cmd --ssl-certfile certs\fullchain.pem --ssl-keyfile certs\privkey.pem --api-key "your_secret"
 ```
 
-Or use environment variables:
+Specify a configuration file:
+
+```cmd
+start_monitor.cmd --config monitor_config.local.json
+```
+
+### Environment Variables
+
+You can also configure using environment variables:
 
 ```cmd
 set MONITOR_API_KEY=your_secret
@@ -57,7 +84,7 @@ start_monitor.cmd
 
 `start_monitor.cmd` starts the service directly. If `.venv` or required packages are missing, it automatically runs `check_env.cmd` first.
 
-Security reminder: do not commit real API keys, private keys, or production config files to a public repository. Keep public examples as placeholders. For real deployments, prefer environment variables or a local config file such as `monitor_config.local.json`, which is ignored by `.gitignore`.
+**Security Reminder**: Do not commit real API keys, private keys, or production config files to a public repository. Keep public examples as placeholders. For real deployments, prefer environment variables or a local config file such as `monitor_config.local.json`, which is ignored by `.gitignore`.
 
 ## Configuration File
 
@@ -93,7 +120,7 @@ Then start the server:
 start_monitor.cmd
 ```
 
-Configuration priority:
+### Configuration Priority
 
 ```text
 command-line arguments > environment variables > monitor_config.json > defaults
@@ -113,14 +140,6 @@ To use another config file:
 ```cmd
 start_monitor.cmd --config monitor_config.local.json
 ```
-
-## Protocol Notes
-
-This API uses TCP, not UDP.
-
-- `/api/metrics` and `/api/hardware` are HTTP APIs. HTTP runs over TCP.
-- `/ws/metrics` is a WebSocket endpoint. WebSocket starts with an HTTP Upgrade and also runs over TCP.
-- This project does not use UDP broadcast.
 
 ## HTTPS / SSL Deployment Recommendation
 
@@ -223,28 +242,77 @@ GET /demo
 
 A minimal page for checking whether WebSocket live data works.
 
+### API Documentation
+
+```http
+GET /docs
+```
+
+Interactive API documentation in Swagger/OpenAPI format.
+
 ## Collected Data
 
-- `system`: uptime, boot time, process count, thread count, handle count.
-- `hardware`: CPU name, memory module information, GPU names, disk device names. The program detects host memory capacity, DDR generation, and frequency, then builds `hardware.memory.name` / `hardware.memory.display_name` such as `32GB DDR5 4800MHz (2 x 16GB)`. Each module also includes `modules[].name` / `modules[].display_name` such as `16GB DDR5 4800MHz` when Windows exposes enough data.
-- `cpu`: total CPU usage, physical cores, logical cores, current frequency, physical processor packages, logical processor usage.
-- `memory`: total, used, available, free memory, and memory usage percentage.
-- `network`: total upload/download speed, total sent/received traffic, per-interface upload/download speed, IP addresses, connection state, and NIC speed.
-- `disk.io`: read/write speed and busy percentage for disk devices.
-- `disk.drives`: capacity of all mounted drive letters/volumes. It is not limited to C: and D:.
-- `gpu`: all NVIDIA GPUs are listed when available. Without NVIDIA, the script tries to read Windows GPU Engine performance counters.
+### System Information (`system`)
+- Uptime
+- Boot time
+- Process count
+- Thread count
+- Handle count
+
+### Hardware Information (`hardware`)
+- CPU name
+- Memory module information (capacity, DDR generation, frequency)
+- GPU names
+- Disk device names
+
+The program detects host memory capacity, DDR generation, and frequency, then builds `hardware.memory.name` / `hardware.memory.display_name` such as `32GB DDR5 4800MHz (2 x 16GB)`. Each module also includes `modules[].name` / `modules[].display_name` such as `16GB DDR5 4800MHz` when Windows exposes enough data.
+
+### CPU (`cpu`)
+- Total CPU usage
+- Physical cores
+- Logical cores
+- Current frequency
+- Physical processor packages
+- Logical processor usage
+
+### Memory (`memory`)
+- Total memory
+- Used memory
+- Available memory
+- Free memory
+- Memory usage percentage
+
+### Network (`network`)
+- Total upload/download speed
+- Total sent/received traffic
+- Per-interface upload/download speed
+- IP addresses
+- Connection state
+- NIC speed
+
+### Disk IO (`disk.io`)
+- Read/write speed for disk devices
+- Busy percentage
+
+### Disk Drives (`disk.drives`)
+- Capacity of all mounted drive letters/volumes
+- Not limited to C: and D:
+
+### GPU (`gpu`)
+- All NVIDIA GPUs are listed when available
+- Without NVIDIA, tries to read Windows GPU Engine performance counters
 
 ## API Key And Frontend Safety
 
 This repository does not include a complete `web` frontend directory. The following sections are embed examples only. Browser-side HTML, JavaScript, Network panels, error screenshots, and access logs can expose URLs or source code. If you put a secret in frontend code, visitors can see it in developer tools.
 
-Recommended practices:
+### Recommended Practices
 
-- Use the `X-API-Key` header for HTTP API requests. Avoid putting secrets in `?api_key=`.
-- Native browser WebSocket cannot set a custom `X-API-Key` header. To make browser-only examples work, WebSocket can use `?api_key=`. For public production deployments, a backend proxy or same-origin reverse proxy is still recommended so the key stays server-side.
-- `?api_key=` is suitable for local tests, troubleshooting, or controlled LAN environments. It can be used by public pages, but it may be exposed through browser URLs, proxy logs, or screenshots.
-- Server-side code such as PHP, Node.js, or Java can keep the API key, but do not commit source code, logs, or config files containing real keys to a public repository.
-- If you must temporarily use `?api_key=`, remember that browser history, proxy logs, server access logs, and screenshots may retain the key.
+1. **HTTP API Requests**: Use the `X-API-Key` header. Avoid putting secrets in `?api_key=`.
+2. **WebSocket Connections**: Native browser WebSocket cannot set a custom `X-API-Key` header. To make browser-only examples work, WebSocket can use `?api_key=`. For public production deployments, a backend proxy or same-origin reverse proxy is still recommended so the key stays server-side.
+3. **Use Cases**: `?api_key=` is suitable for local tests, troubleshooting, or controlled LAN environments. It can be used by public pages, but it may be exposed through browser URLs, proxy logs, or screenshots.
+4. **Server-side Code**: Server-side code such as PHP, Node.js, or Java can keep the API key, but do not commit source code, logs, or config files containing real keys to a public repository.
+5. **Risk Warning**: If you must temporarily use `?api_key=`, remember that browser history, proxy logs, server access logs, and screenshots may retain the key.
 
 ## HTML Embed Example
 
@@ -272,7 +340,26 @@ Replace `SERVER_HOST` with your server IP or domain. This browser-only example w
     <div class="card">Threads<div id="threads" class="value">-</div></div>
     <div class="card">Handles<div id="handles" class="value">-</div></div>
     <div class="card">Uptime<div id="uptime" class="value">-</div></div>
+    <div class="card">GPU<div id="gpu" class="value">-</div></div>
+    <div class="card">Network In<div id="netIn" class="value">-</div></div>
+    <div class="card">Network Out<div id="netOut" class="value">-</div></div>
+    <div class="card">Disk Read<div id="diskRead" class="value">-</div></div>
+    <div class="card">Disk Write<div id="diskWrite" class="value">-</div></div>
   </div>
+  <h2>All Disk Drives</h2>
+  <pre id="drives">-</pre>
+  <h2>All Disk Devices</h2>
+  <pre id="diskNames">-</pre>
+  <h2>All Network Interfaces</h2>
+  <pre id="interfaces">-</pre>
+  <h2>All GPUs</h2>
+  <pre id="gpus">-</pre>
+  <h2>Memory Hardware</h2>
+  <pre id="memoryHardware">-</pre>
+  <h2>All Physical Processors</h2>
+  <pre id="cpuPackages">-</pre>
+  <h2>All Logical Processors</h2>
+  <pre id="processors">-</pre>
 
   <script>
     const SERVER_HOST = "127.0.0.1:8765";
@@ -288,6 +375,35 @@ Replace `SERVER_HOST` with your server IP or domain. This browser-only example w
       document.getElementById("threads").textContent = data.system.thread_count;
       document.getElementById("handles").textContent = data.system.handle_count ?? "N/A";
       document.getElementById("uptime").textContent = data.system.uptime_human;
+      document.getElementById("gpu").textContent = data.gpu.available
+        ? `${data.gpu.average_utilization_percent}%`
+        : "N/A";
+      document.getElementById("netIn").textContent = `${data.network.received_mb_per_second} MB/s`;
+      document.getElementById("netOut").textContent = `${data.network.sent_mb_per_second} MB/s`;
+      document.getElementById("diskRead").textContent = `${data.disk.io.read_mb_per_second} MB/s`;
+      document.getElementById("diskWrite").textContent = `${data.disk.io.write_mb_per_second} MB/s`;
+
+      document.getElementById("drives").textContent = Object.entries(data.disk.drives)
+        .map(([name, drive]) => `${name} ${drive.used_percent ?? "N/A"}% used, free ${drive.free_gb ?? "N/A"} GB`)
+        .join("\n");
+      document.getElementById("diskNames").textContent = data.hardware.disk.devices
+        .map((disk) => `${disk.index}: ${disk.name}`)
+        .join("\n") || "N/A";
+      document.getElementById("interfaces").textContent = Object.entries(data.network.interfaces)
+        .map(([name, nic]) => `${name}: down ${nic.received_mb_per_second} MB/s, up ${nic.sent_mb_per_second} MB/s, ${nic.is_up ? "up" : "down"}`)
+        .join("\n");
+      document.getElementById("gpus").textContent = data.hardware.gpu.devices
+        .map((gpu) => `${gpu.index}: ${gpu.name}`)
+        .join("\n") || "N/A";
+      document.getElementById("memoryHardware").textContent = data.hardware.memory.module_details_available
+        ? data.hardware.memory.modules.map((module) => `${module.index}: ${module.display_name ?? `${module.manufacturer ?? ""} ${module.part_number ?? ""} ${module.capacity_gb ?? "N/A"} GB`}`).join("\n")
+        : `Total ${data.hardware.memory.total_gb} GB\n${data.hardware.memory.message ?? ""}`;
+      document.getElementById("cpuPackages").textContent = data.cpu.processors
+        .map((cpu) => `${cpu.device_id}: ${cpu.name}, load ${cpu.load_percent ?? "N/A"}%`)
+        .join("\n") || "N/A";
+      document.getElementById("processors").textContent = data.cpu.logical_processors
+        .map((cpu) => `CPU ${cpu.index}: ${cpu.usage_percent}%`)
+        .join("\n");
     };
   </script>
 </body>
@@ -348,9 +464,14 @@ fetchHardware().then((hardware) => {
 fetchMetrics().then(console.log);
 subscribeMetrics((data) => {
   console.log("CPU:", data.cpu.usage_percent);
+  console.log("CPU name:", data.hardware.cpu.name);
   console.log("Processes:", data.system.process_count);
   console.log("Network interfaces:", data.network.interfaces);
   console.log("Drives:", data.disk.drives);
+  console.log("Disk IO:", data.disk.io.devices);
+  console.log("GPUs:", data.gpu.devices);
+  console.log("CPU packages:", data.cpu.processors);
+  console.log("Logical processors:", data.cpu.logical_processors);
 });
 ```
 
@@ -404,6 +525,55 @@ $data = json_decode($body, true);
   <p>Threads: <?= htmlspecialchars($data['system']['thread_count']) ?></p>
   <p>Handles: <?= htmlspecialchars($data['system']['handle_count'] ?? 'N/A') ?></p>
   <p>Uptime: <?= htmlspecialchars($data['system']['uptime_human']) ?></p>
+
+  <h2>Drives</h2>
+  <ul>
+    <?php foreach ($data['disk']['drives'] as $name => $drive): ?>
+      <li>
+        <?= htmlspecialchars($name) ?>:
+        <?= htmlspecialchars($drive['used_percent'] ?? 'N/A') ?>% used,
+        <?= htmlspecialchars($drive['free_gb'] ?? 'N/A') ?> GB free
+      </li>
+    <?php endforeach; ?>
+  </ul>
+
+  <h2>Disk Devices</h2>
+  <ul>
+    <?php foreach ($data['hardware']['disk']['devices'] as $disk): ?>
+      <li><?= htmlspecialchars($disk['name'] ?? 'N/A') ?></li>
+    <?php endforeach; ?>
+  </ul>
+
+  <h2>GPU Devices</h2>
+  <ul>
+    <?php foreach ($data['hardware']['gpu']['devices'] as $gpu): ?>
+      <li><?= htmlspecialchars($gpu['name'] ?? 'N/A') ?></li>
+    <?php endforeach; ?>
+  </ul>
+
+  <h2>Memory Hardware</h2>
+  <?php if ($data['hardware']['memory']['module_details_available']): ?>
+    <ul>
+      <?php foreach ($data['hardware']['memory']['modules'] as $module): ?>
+        <li>
+          <?= htmlspecialchars($module['display_name'] ?? (($module['manufacturer'] ?? '') . ' ' . ($module['part_number'] ?? '') . ' ' . ($module['capacity_gb'] ?? 'N/A') . ' GB')) ?>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  <?php else: ?>
+    <p>Total memory: <?= htmlspecialchars($data['hardware']['memory']['total_gb']) ?> GB</p>
+  <?php endif; ?>
+
+  <h2>Network Interfaces</h2>
+  <ul>
+    <?php foreach ($data['network']['interfaces'] as $name => $nic): ?>
+      <li>
+        <?= htmlspecialchars($name) ?>:
+        down <?= htmlspecialchars($nic['received_mb_per_second']) ?> MB/s,
+        up <?= htmlspecialchars($nic['sent_mb_per_second']) ?> MB/s
+      </li>
+    <?php endforeach; ?>
+  </ul>
 </body>
 </html>
 ```
@@ -422,6 +592,27 @@ WebSocket connections, disconnections, and authentication failures are also logg
 
 The script prefers `nvidia-smi` for NVIDIA GPU usage, VRAM, and temperature. If no NVIDIA GPU is available, it tries to read Windows GPU Engine performance counters. Different GPUs and drivers expose different data, so non-NVIDIA GPUs may only provide usage percentage while memory and temperature may be `null`.
 
+## Frequently Asked Questions
 
+### Why is memory module information unavailable?
+Windows has restrictions on CIM/WMI access, which may require administrator privileges or group policy adjustments.
 
+### How do I view detailed error logs?
+Check the `server_monitor.log` file, which contains detailed logs of all HTTP requests and WebSocket connections.
 
+### Can I use this on Linux?
+The current version only supports Windows because it uses Windows-specific performance counters and WMI interfaces.
+
+### How do I change the data collection interval?
+Set it via the `--interval` argument or the `MONITOR_INTERVAL_SECONDS` environment variable, in seconds.
+
+## Technology Stack
+
+- Python 3.10+
+- aiohttp (Asynchronous HTTP Server)
+- psutil (System Monitoring)
+- asyncio (Asynchronous Programming)
+
+## License
+
+This project is licensed under the MIT License.
