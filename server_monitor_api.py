@@ -44,6 +44,15 @@ def bytes_to_mb(value: int | float) -> float:
     return round(float(value) / 1024 / 1024, 2)
 
 
+def safe_percent(used: int | float | None, total: int | float | None) -> float | None:
+    if used is None or total is None:
+        return None
+    total_value = float(total)
+    if total_value <= 0:
+        return None
+    return round(min(max(float(used) / total_value * 100, 0), 100), 2)
+
+
 def seconds_to_human(seconds: int | float) -> str:
     seconds = int(seconds)
     days, remainder = divmod(seconds, 86400)
@@ -309,6 +318,13 @@ def read_nvidia_gpu() -> list[dict[str, Any]]:
                     "utilization_percent": float(util),
                     "memory_used_mb": float(memory_used),
                     "memory_total_mb": float(memory_total),
+                    "memory_usage_percent": safe_percent(float(memory_used), float(memory_total)),
+                    "dedicated_memory_used_mb": float(memory_used),
+                    "dedicated_memory_total_mb": float(memory_total),
+                    "dedicated_memory_usage_percent": safe_percent(float(memory_used), float(memory_total)),
+                    "shared_memory_used_mb": None,
+                    "shared_memory_total_mb": None,
+                    "shared_memory_usage_percent": None,
                     "temperature_c": float(temperature),
                     "source": "nvidia-smi",
                 }
@@ -316,6 +332,72 @@ def read_nvidia_gpu() -> list[dict[str, Any]]:
         except ValueError:
             continue
     return gpus
+
+
+def read_windows_gpu_memory() -> dict[str, Any] | None:
+    data = run_powershell_json(
+        "$ErrorActionPreference='SilentlyContinue';"
+        "$paths=@("
+        "'\\GPU Adapter Memory(*)\\Dedicated Usage',"
+        "'\\GPU Adapter Memory(*)\\Dedicated Limit',"
+        "'\\GPU Adapter Memory(*)\\Shared Usage',"
+        "'\\GPU Adapter Memory(*)\\Shared Limit'"
+        ");"
+        "(Get-Counter $paths).CounterSamples | ForEach-Object {"
+        "[PSCustomObject]@{"
+        "InstanceName=$_.InstanceName;"
+        "CounterName=($_.Path -split '\\\\')[-1];"
+        "CookedValue=$_.CookedValue"
+        "}"
+        "} | ConvertTo-Json -Compress",
+        timeout=4,
+    )
+    if data is None:
+        return None
+    if isinstance(data, dict):
+        data = [data]
+
+    totals = {
+        "dedicated_used": 0.0,
+        "dedicated_total": 0.0,
+        "shared_used": 0.0,
+        "shared_total": 0.0,
+    }
+    for sample in data:
+        instance_name = str(sample.get("InstanceName") or "").strip().lower()
+        if instance_name == "_total":
+            continue
+        counter_name = str(sample.get("CounterName") or "").strip().lower()
+        try:
+            value = float(sample.get("CookedValue") or 0)
+        except (TypeError, ValueError):
+            continue
+
+        if counter_name == "dedicated usage":
+            totals["dedicated_used"] += value
+        elif counter_name == "dedicated limit":
+            totals["dedicated_total"] += value
+        elif counter_name == "shared usage":
+            totals["shared_used"] += value
+        elif counter_name == "shared limit":
+            totals["shared_total"] += value
+
+    dedicated_total_mb = bytes_to_mb(totals["dedicated_total"]) if totals["dedicated_total"] > 0 else None
+    dedicated_used_mb = bytes_to_mb(totals["dedicated_used"]) if dedicated_total_mb is not None or totals["dedicated_used"] > 0 else None
+    shared_total_mb = bytes_to_mb(totals["shared_total"]) if totals["shared_total"] > 0 else None
+    shared_used_mb = bytes_to_mb(totals["shared_used"]) if shared_total_mb is not None or totals["shared_used"] > 0 else None
+
+    if dedicated_used_mb is None and dedicated_total_mb is None and shared_used_mb is None and shared_total_mb is None:
+        return None
+
+    return {
+        "dedicated_memory_used_mb": dedicated_used_mb,
+        "dedicated_memory_total_mb": dedicated_total_mb,
+        "dedicated_memory_usage_percent": safe_percent(totals["dedicated_used"], totals["dedicated_total"]),
+        "shared_memory_used_mb": shared_used_mb,
+        "shared_memory_total_mb": shared_total_mb,
+        "shared_memory_usage_percent": safe_percent(totals["shared_used"], totals["shared_total"]),
+    }
 
 
 def read_windows_gpu_counter() -> list[dict[str, Any]]:
@@ -346,13 +428,21 @@ def read_windows_gpu_counter() -> list[dict[str, Any]]:
     except ValueError:
         return []
 
+    gpu_memory = read_windows_gpu_memory() or {}
     return [
         {
             "index": 0,
             "name": "Windows GPU Engine",
             "utilization_percent": min(round(utilization, 2), 100.0),
-            "memory_used_mb": None,
-            "memory_total_mb": None,
+            "memory_used_mb": gpu_memory.get("dedicated_memory_used_mb"),
+            "memory_total_mb": gpu_memory.get("dedicated_memory_total_mb"),
+            "memory_usage_percent": gpu_memory.get("dedicated_memory_usage_percent"),
+            "dedicated_memory_used_mb": gpu_memory.get("dedicated_memory_used_mb"),
+            "dedicated_memory_total_mb": gpu_memory.get("dedicated_memory_total_mb"),
+            "dedicated_memory_usage_percent": gpu_memory.get("dedicated_memory_usage_percent"),
+            "shared_memory_used_mb": gpu_memory.get("shared_memory_used_mb"),
+            "shared_memory_total_mb": gpu_memory.get("shared_memory_total_mb"),
+            "shared_memory_usage_percent": gpu_memory.get("shared_memory_usage_percent"),
             "temperature_c": None,
             "source": "windows-performance-counter",
         }
@@ -741,7 +831,22 @@ def collect_gpu() -> dict[str, Any]:
         }
 
     average = round(sum(gpu["utilization_percent"] for gpu in gpus) / len(gpus), 2)
-    return {"available": True, "average_utilization_percent": average, "devices": gpus}
+    dedicated_used_mb = sum(float(gpu.get("dedicated_memory_used_mb") or 0) for gpu in gpus)
+    dedicated_total_mb = sum(float(gpu.get("dedicated_memory_total_mb") or 0) for gpu in gpus)
+    shared_used_mb = sum(float(gpu.get("shared_memory_used_mb") or 0) for gpu in gpus)
+    shared_total_mb = sum(float(gpu.get("shared_memory_total_mb") or 0) for gpu in gpus)
+
+    return {
+        "available": True,
+        "average_utilization_percent": average,
+        "dedicated_memory_total_mb": round(dedicated_total_mb, 2) if dedicated_total_mb > 0 else None,
+        "dedicated_memory_used_mb": round(dedicated_used_mb, 2) if dedicated_total_mb > 0 or dedicated_used_mb > 0 else None,
+        "dedicated_memory_usage_percent": safe_percent(dedicated_used_mb, dedicated_total_mb),
+        "shared_memory_total_mb": round(shared_total_mb, 2) if shared_total_mb > 0 else None,
+        "shared_memory_used_mb": round(shared_used_mb, 2) if shared_total_mb > 0 or shared_used_mb > 0 else None,
+        "shared_memory_usage_percent": safe_percent(shared_used_mb, shared_total_mb),
+        "devices": gpus,
+    }
 
 
 def collect_disk_usage() -> dict[str, Any]:
@@ -1152,10 +1257,6 @@ def parse_args() -> Settings:
     ssl_certfile = args.ssl_certfile if args.ssl_certfile is not None else config_value(config, "MONITOR_SSL_CERTFILE", "ssl_certfile")
     ssl_keyfile = args.ssl_keyfile if args.ssl_keyfile is not None else config_value(config, "MONITOR_SSL_KEYFILE", "ssl_keyfile")
 
-    if api_key is None and sys.stdin.isatty() and os.getenv("MONITOR_SKIP_KEY_PROMPT") != "1":
-        print("")
-        api_key = input("Set API key now? Press Enter to skip, or type a key: ").strip() or None
-
     return Settings(
         host=host,
         port=port,
@@ -1192,18 +1293,42 @@ def validate_ssl_settings(settings: Settings) -> None:
     settings.ssl_keyfile = key_path
 
 
+def print_section_title(title: str) -> None:
+    line = "=" * 64
+    print("")
+    print(f"{CYAN}{line}{RESET}")
+    print(f"{CYAN}{title}{RESET}")
+    print(f"{CYAN}{line}{RESET}")
+
+
+def show_startup_progress(label: str = "Preparing monitor") -> None:
+    bar_width = 28
+    if not sys.stdout.isatty():
+        print(f"{label}...")
+        return
+
+    for step in range(bar_width + 1):
+        filled = "#" * step
+        empty = "." * (bar_width - step)
+        percent = int(step / bar_width * 100)
+        sys.stdout.write(f"\r{CYAN}{label:<22}{RESET} [{filled}{empty}] {percent:3d}%")
+        sys.stdout.flush()
+        time.sleep(0.02)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
 def print_feature_status(name: str, ok: bool, detail: str | None = None) -> None:
     status = f"{GREEN}[True]{RESET}" if ok else f"{RED}[False]{RESET}"
     if ok:
-        print(f"{name}{status}" + (f" {detail}" if detail else ""))
+        print(f"{name:<20} {status}" + (f" {detail}" if detail else ""))
     else:
         reason = detail or "Unable to read this feature."
-        print(f"{name}{status} {RED}{reason}{RESET}")
+        print(f"{name:<20} {status} {RED}{reason}{RESET}")
 
 
 def run_startup_feature_checks(settings: Settings) -> StartupCheckResult:
-    print("")
-    print(f"{CYAN}Startup feature checks{RESET}")
+    print_section_title("Startup feature checks")
     result = StartupCheckResult()
 
     try:
@@ -1297,15 +1422,13 @@ def print_startup_links(settings: Settings) -> None:
     auth_hint = "enabled" if settings.api_key else "disabled"
     http_scheme = "https" if settings.ssl_enabled else "http"
     ws_scheme = "wss" if settings.ssl_enabled else "ws"
-    print("")
-    print("Windows Server Monitor API started")
+    print_section_title("Windows Server Monitor API started")
     print(f"Local API:      {http_scheme}://127.0.0.1:{settings.port}/api/metrics")
     print(f"LAN API:        {http_scheme}://{lan_ip}:{settings.port}/api/metrics")
     print(f"Hardware API:   {http_scheme}://{lan_ip}:{settings.port}/api/hardware")
     print(f"WebSocket:      {ws_scheme}://{lan_ip}:{settings.port}/ws/metrics")
     print(f"Demo page:      {http_scheme}://127.0.0.1:{settings.port}/demo")
     print(f"Docs:           {http_scheme}://127.0.0.1:{settings.port}/docs")
-    print(f"Protocol:       {'HTTPS and WSS' if settings.ssl_enabled else 'HTTP and WebSocket'} over TCP, not UDP")
     print(f"Interval:       {settings.interval_seconds}s")
     print(f"API key:        {auth_hint}")
     print(f"SSL:            {'enabled' if settings.ssl_enabled else 'disabled'}")
@@ -1320,6 +1443,7 @@ def main() -> None:
     configure_logging()
     settings = parse_args()
     validate_ssl_settings(settings)
+    show_startup_progress()
     check_result = run_startup_feature_checks(settings)
     print_startup_links(settings)
     app = build_app(settings, initial_hardware=check_result.hardware)
@@ -1336,14 +1460,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
 
 

@@ -18,15 +18,7 @@ Start the API server:
 start_monitor.cmd
 ```
 
-On startup, the program asks:
-
-```text
-Set API key now? Press Enter to skip, or type a key:
-```
-
-Press Enter to run without an API key, or type a key to protect this run.
-
-The program then prints startup feature checks. Available features are shown in green as `[True]`; unavailable features are shown in red as `[False]` with a reason, for example:
+The program starts directly and prints startup feature checks. Available features are shown in green as `[True]`; unavailable features are shown in red as `[False]` with a reason, for example:
 
 ```text
 CPU[True] total=8.2%, logical=12
@@ -429,7 +421,6 @@ WebSocket connections, disconnections, and authentication failures are also logg
 ## GPU Notes
 
 The script prefers `nvidia-smi` for NVIDIA GPU usage, VRAM, and temperature. If no NVIDIA GPU is available, it tries to read Windows GPU Engine performance counters. Different GPUs and drivers expose different data, so non-NVIDIA GPUs may only provide usage percentage while memory and temperature may be `null`.
-
 
 
 

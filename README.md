@@ -20,15 +20,7 @@ check_env.cmd
 start_monitor.cmd
 ```
 
-程序启动后会提示：
-
-```text
-Set API key now? Press Enter to skip, or type a key:
-```
-
-直接按回车表示不设置密钥；输入内容则会作为本次启动的 API 密钥。
-
-随后程序会显示启动自检结果。能读取的项目会显示绿色 `[True]`，不能读取的项目会显示红色 `[False]` 并给出原因，例如：
+程序会直接启动并显示启动自检结果。能读取的项目会显示绿色 `[True]`，不能读取的项目会显示红色 `[False]` 并给出原因，例如：
 
 ```text
 CPU[True] total=8.2%, logical=12
@@ -533,7 +525,6 @@ WebSocket 的连接、断开和鉴权失败也会记录。
 ## GPU 说明
 
 脚本会优先使用 `nvidia-smi` 获取 NVIDIA GPU 的占用、显存和温度。如果没有 NVIDIA GPU，会尝试读取 Windows 的 GPU Engine 性能计数器。不同显卡和驱动暴露的数据不完全一致，所以非 NVIDIA 显卡可能只能拿到 GPU 使用率，显存和温度可能为 `null`。
-
 
 
 
